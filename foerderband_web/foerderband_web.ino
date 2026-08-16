@@ -23,7 +23,7 @@
   GitHub: https://github.com/...
 */
 
-#define FIRMWARE_VERSION "1.1.0"
+#define FIRMWARE_VERSION "1.2.0"
 
 #include <ESP8266WiFi.h>
 #include <ESP8266WebServer.h>
@@ -188,6 +188,11 @@ void handleRoot() {
   // --- Tab: Firmware ---
   html += "<div class='pane' id='firmware'>";
   html += "<p>Aktuelle Firmware: <b>v" FIRMWARE_VERSION "</b></p>";
+
+  // Update-Check
+  html += "<button type='button' class='sec' id='checkbtn' onclick='checkUpdate()' style='margin-top:0;margin-bottom:6px;'>Auf Updates prüfen</button>";
+  html += "<div id='updcheck' style='margin-bottom:12px;'></div>";
+
   html += "<p>Waehle eine neue <code>.bin</code>-Datei aus und klicke auf Hochladen.<br>";
   html += "Das Geraet startet nach dem Update automatisch neu.</p>";
   html += "<form method='POST' action='/update' enctype='multipart/form-data' id='upd'>";
@@ -197,6 +202,32 @@ void handleRoot() {
   html += "<button type='submit' id='updbtn' disabled>Firmware hochladen</button>";
   html += "</form>";
   html += "<script>";
+
+  // Update-Check via GitHub raw (laeuft im Browser, nicht auf dem ESP)
+  html += "function checkUpdate(){";
+  html += "var btn=document.getElementById('checkbtn');";
+  html += "var div=document.getElementById('updcheck');";
+  html += "btn.disabled=true;btn.textContent='Prüfe...';";
+  html += "fetch('https://raw.githubusercontent.com/samson2803/ESP-Foerderband/main/version.txt')";
+  html += ".then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.text();})";
+  html += ".then(function(t){";
+  html += "var latest=t.trim();";
+  html += "var cur='" FIRMWARE_VERSION "';";
+  html += "if(latest===cur){";
+  html += "div.innerHTML='<div class=\"upd-ok\">&#10003; Firmware ist aktuell (v'+cur+')</div>';";
+  html += "}else{";
+  html += "div.innerHTML='<div style=\"padding:10px;background:#fff3cd;border-radius:6px;color:#555;\">"
+          "&#11014; Neue Version verfügbar: <b>v'+latest+'</b> &nbsp;&mdash;&nbsp;"
+          "<a href=\"https://github.com/samson2803/ESP-Foerderband/releases\" target=\"_blank\">Download auf GitHub</a></div>';";
+  html += "}";
+  html += "btn.disabled=false;btn.textContent='Auf Updates prüfen';";
+  html += "})";
+  html += ".catch(function(e){";
+  html += "div.innerHTML='<div class=\"upd-err\">Fehler beim Abruf: '+e.message+'</div>';";
+  html += "btn.disabled=false;btn.textContent='Auf Updates prüfen';";
+  html += "});}";
+
+  // Upload-Fortschritt
   html += "document.getElementById('upd').onsubmit=function(e){";
   html += "var f=this.querySelector('input[type=file]').files[0];";
   html += "if(!f)return false;";
@@ -212,7 +243,7 @@ void handleRoot() {
   html += "document.getElementById('firmware').innerHTML='<div class=\"upd-ok\"><b>Update erfolgreich!</b> Geraet startet neu...<br>Seite laedt in 8 Sekunden neu.</div>';";
   html += "setTimeout(()=>location.href='/',8000);";
   html += "}else{";
-  html += "document.getElementById('firmware').innerHTML='<div class=\"upd-err\"><b>Update fehlgeschlagen.</b> Bitte erneut versuchen.</div>';";
+  html += "document.getElementById('firmware').innerHTML='<div class=\"upd-err\"><b>Update fehlgeschlagen:</b> '+xhr.responseText+'</div>';";
   html += "}};";
   html += "xhr.send(fd);};";
   html += "</script>";
