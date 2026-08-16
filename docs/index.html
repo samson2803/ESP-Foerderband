@@ -1,0 +1,1145 @@
+<title>ESP-Förderband</title>
+<meta name="description" content="Vollständige Projektdokumentation: Schaltplan, Verdrahtung, Bauteile und Software für die ESP8266-Förderband-Steuerung.">
+<style>
+  /* ── Token system ── */
+  :root {
+    --bg:          #0d1117;
+    --surface:     #161b22;
+    --surface2:    #21262d;
+    --border:      #30363d;
+    --text:        #e6edf3;
+    --muted:       #8b949e;
+    --accent:      #f0c040;
+    --accent-dim:  #3d2e00;
+    --blue:        #79c0ff;
+    --green:       #56d364;
+    --purple:      #bc8cff;
+    --orange:      #ffa657;
+    --red:         #ff7b72;
+    --teal:        #39d3bb;
+    --wire-step:   #79c0ff;
+    --wire-dir:    #ffa657;
+    --wire-ena:    #bc8cff;
+    --wire-3v3:    #ff7b72;
+    --wire-gnd:    #8b949e;
+    --wire-motor:  #f0c040;
+    --wire-coilA:  #56d364;
+    --wire-coilB:  #39d3bb;
+    --wire-sensor: #56d364;
+  }
+  @media (prefers-color-scheme: light) {
+    :root:not([data-theme="dark"]) {
+      --bg:         #f6f8fa;
+      --surface:    #ffffff;
+      --surface2:   #f0f2f5;
+      --border:     #d0d7de;
+      --text:       #1f2328;
+      --muted:      #656d76;
+      --accent:     #9a6700;
+      --accent-dim: #fff3cd;
+      --blue:       #0969da;
+      --green:      #1a7f37;
+      --purple:     #8250df;
+      --orange:     #bc4c00;
+      --red:        #cf222e;
+      --teal:       #1b7c83;
+      --wire-step:  #0969da;
+      --wire-dir:   #bc4c00;
+      --wire-ena:   #8250df;
+      --wire-3v3:   #cf222e;
+      --wire-gnd:   #656d76;
+      --wire-motor: #9a6700;
+      --wire-coilA: #1a7f37;
+      --wire-coilB: #1b7c83;
+      --wire-sensor:#1a7f37;
+    }
+  }
+  :root[data-theme="light"] {
+    --bg:         #f6f8fa;
+    --surface:    #ffffff;
+    --surface2:   #f0f2f5;
+    --border:     #d0d7de;
+    --text:       #1f2328;
+    --muted:      #656d76;
+    --accent:     #9a6700;
+    --accent-dim: #fff3cd;
+    --blue:       #0969da;
+    --green:      #1a7f37;
+    --purple:     #8250df;
+    --orange:     #bc4c00;
+    --red:        #cf222e;
+    --teal:       #1b7c83;
+    --wire-step:  #0969da;
+    --wire-dir:   #bc4c00;
+    --wire-ena:   #8250df;
+    --wire-3v3:   #cf222e;
+    --wire-gnd:   #656d76;
+    --wire-motor: #9a6700;
+    --wire-coilA: #1a7f37;
+    --wire-coilB: #1b7c83;
+    --wire-sensor:#1a7f37;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+    font-size: 15px;
+    line-height: 1.7;
+    max-width: 920px;
+    margin: 0 auto;
+    padding: 0 20px 80px;
+  }
+
+  /* ── Header ── */
+  header {
+    border-bottom: 2px solid var(--accent);
+    padding: 48px 0 32px;
+    margin-bottom: 48px;
+  }
+  .eyebrow {
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    letter-spacing: .18em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 12px;
+  }
+  h1 {
+    font-family: 'Courier New', monospace;
+    font-size: clamp(28px, 5vw, 48px);
+    font-weight: 700;
+    line-height: 1.15;
+    text-wrap: balance;
+    color: var(--text);
+    margin-bottom: 14px;
+  }
+  .subtitle {
+    color: var(--muted);
+    font-size: 16px;
+    max-width: 600px;
+  }
+  .badge-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 20px;
+  }
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    padding: 3px 10px;
+    border-radius: 20px;
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+  .badge.highlight { border-color: var(--accent); color: var(--accent); }
+
+  /* ── Section titles ── */
+  h2 {
+    font-family: 'Courier New', monospace;
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 20px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border);
+    text-wrap: balance;
+  }
+  h2 .num {
+    color: var(--accent);
+    margin-right: 10px;
+  }
+  h3 {
+    font-family: 'Courier New', monospace;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--muted);
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    margin: 28px 0 12px;
+  }
+  section { margin-bottom: 56px; }
+
+  /* ── Cards ── */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px 24px;
+    margin-bottom: 16px;
+  }
+
+  /* ── Parts table ── */
+  .parts-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+  @media (max-width: 600px) { .parts-grid { grid-template-columns: 1fr; } }
+  .part-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 16px;
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+  }
+  .part-icon {
+    font-size: 22px;
+    line-height: 1;
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+  .part-name { font-weight: 600; font-size: 14px; color: var(--text); }
+  .part-detail { font-size: 13px; color: var(--muted); margin-top: 2px; }
+  .part-link { font-size: 12px; margin-top: 5px; }
+  .part-link a { color: var(--accent); text-decoration: none; }
+  .part-link a:hover { text-decoration: underline; }
+  .part-qty {
+    margin-left: auto;
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    color: var(--accent);
+    background: var(--accent-dim);
+    padding: 1px 7px;
+    border-radius: 10px;
+    flex-shrink: 0;
+    align-self: flex-start;
+  }
+
+  /* ── Pin table ── */
+  .table-wrap { overflow-x: auto; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+    font-variant-numeric: tabular-nums;
+  }
+  th {
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    text-align: left;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  td {
+    padding: 9px 12px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: middle;
+  }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: var(--surface2); }
+  code {
+    font-family: 'Courier New', monospace;
+    font-size: 13px;
+    background: var(--surface2);
+    padding: 1px 6px;
+    border-radius: 4px;
+    color: var(--blue);
+  }
+  .dot {
+    display: inline-block;
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    margin-right: 6px;
+    flex-shrink: 0;
+  }
+
+  /* ── Wiring diagram ── */
+  .diagram-wrap {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  canvas {
+    display: block;
+    width: 100%;
+    height: auto;
+    max-width: 100%;
+  }
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px 24px;
+    padding: 14px 20px;
+    border-top: 1px solid var(--border);
+    background: var(--surface2);
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .legend-line {
+    width: 28px; height: 3px;
+    border-radius: 2px;
+  }
+
+  /* ── Steps ── */
+  .steps { display: flex; flex-direction: column; gap: 0; }
+  .step {
+    display: grid;
+    grid-template-columns: 36px 1fr;
+    gap: 0 16px;
+    padding-bottom: 24px;
+    position: relative;
+  }
+  .step:not(:last-child)::before {
+    content: '';
+    position: absolute;
+    left: 17px; top: 36px; bottom: 0;
+    width: 2px;
+    background: var(--border);
+  }
+  .step-num {
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    background: var(--accent-dim);
+    border: 2px solid var(--accent);
+    color: var(--accent);
+    font-family: 'Courier New', monospace;
+    font-weight: 700;
+    font-size: 14px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    z-index: 1;
+  }
+  .step-body { padding-top: 6px; }
+  .step-title { font-weight: 600; margin-bottom: 6px; }
+  .step-desc { color: var(--muted); font-size: 14px; }
+  .step-desc code { color: var(--blue); }
+
+  /* ── Microstepping table ── */
+  .ms-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    font-family: 'Courier New', monospace;
+    font-size: 13px;
+  }
+  .ms-cell {
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border);
+    border-right: 1px solid var(--border);
+  }
+  .ms-cell:nth-child(4n) { border-right: none; }
+  .ms-cell.head {
+    background: var(--surface2);
+    font-size: 11px;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .ms-cell.active { background: var(--accent-dim); color: var(--accent); font-weight: 700; }
+  .ms-cell.last-row { border-bottom: none; }
+  .pin-hi { color: var(--red); font-weight: 700; }
+  .pin-lo { color: var(--muted); }
+
+  /* ── MakerWorld card ── */
+  .mw-card {
+    background: var(--surface);
+    border: 1px solid var(--accent);
+    border-radius: 10px;
+    padding: 24px;
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 20px;
+    align-items: center;
+    text-decoration: none;
+    color: inherit;
+    transition: background .15s;
+  }
+  .mw-card:hover { background: var(--accent-dim); }
+  .mw-icon {
+    width: 56px; height: 56px;
+    background: var(--accent);
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 28px;
+    flex-shrink: 0;
+  }
+  .mw-label {
+    font-size: 11px;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--accent);
+    font-family: 'Courier New', monospace;
+    margin-bottom: 4px;
+  }
+  .mw-title { font-weight: 700; font-size: 16px; margin-bottom: 4px; }
+  .mw-desc { color: var(--muted); font-size: 13px; }
+
+  /* ── Warning / Note ── */
+  .note {
+    border-left: 3px solid var(--orange);
+    background: var(--surface);
+    border-radius: 0 6px 6px 0;
+    padding: 12px 16px;
+    font-size: 14px;
+    color: var(--muted);
+    margin: 16px 0;
+  }
+  .note strong { color: var(--orange); }
+  .note.danger { border-color: var(--red); }
+  .note.danger strong { color: var(--red); }
+  .note.tip { border-color: var(--green); }
+  .note.tip strong { color: var(--green); }
+
+  /* ── Firmware changelog ── */
+  .changelog { display: flex; flex-direction: column; gap: 12px; }
+  .cl-entry {
+    display: grid;
+    grid-template-columns: 90px 1fr;
+    gap: 16px;
+    align-items: start;
+  }
+  .cl-ver {
+    font-family: 'Courier New', monospace;
+    font-size: 13px;
+    color: var(--accent);
+    background: var(--accent-dim);
+    padding: 2px 8px;
+    border-radius: 4px;
+    text-align: center;
+  }
+  .cl-items { font-size: 14px; color: var(--muted); }
+  .cl-items li { margin-left: 16px; }
+
+  footer {
+    border-top: 1px solid var(--border);
+    padding-top: 24px;
+    font-size: 13px;
+    color: var(--muted);
+    text-align: center;
+  }
+  footer a { color: var(--accent); text-decoration: none; }
+  footer a:hover { text-decoration: underline; }
+</style>
+
+<header>
+  <div class="eyebrow">Projektdokumentation · v1.0.0</div>
+  <h1>ESP-Förderband<br>Steuerung</h1>
+  <p class="subtitle">Automatischer Poop-Chute für Bambu Lab Drucker mit NodeMCU ESP8266, DRV8825 und WLAN-Webinterface.</p>
+  <div class="badge-row">
+    <span class="badge highlight">v1.0.0</span>
+    <span class="badge">NodeMCU ESP8266</span>
+    <span class="badge">DRV8825 · 1/32</span>
+    <span class="badge">MIT Lizenz</span>
+    <span class="badge">WLAN · OTA</span>
+  </div>
+</header>
+
+<section>
+  <h2><span class="num">01</span>Überblick</h2>
+  <p style="color:var(--muted);margin-bottom:16px;">
+    Beim Filamentwechsel fährt der Druckkopf des Bambu Lab A1 Mini auf die Y-Achsen-Endposition.
+    Eine Lichtschranke erkennt diese Position per Flankenerkennung und startet das Förderband —
+    der Purge-Abfall (Poop) wird automatisch in einen Schacht befördert, der in einem Mülleimer endet.
+    Alle Parameter sind über ein WLAN-Webinterface konfigurierbar und werden permanent im EEPROM gespeichert.
+  </p>
+  <div class="card" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+    <div>
+      <div style="font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-family:'Courier New',monospace;margin-bottom:8px;">Funktion</div>
+      <ul style="list-style:none;display:flex;flex-direction:column;gap:6px;font-size:14px;">
+        <li style="color:var(--green);">✓ Automatische Auslösung per Lichtschranke</li>
+        <li style="color:var(--green);">✓ WLAN-Webinterface (kein App nötig)</li>
+        <li style="color:var(--green);">✓ OTA-Firmware-Update per Browser</li>
+        <li style="color:var(--green);">✓ EEPROM-Persistenz aller Einstellungen</li>
+        <li style="color:var(--green);">✓ Captive Portal für WLAN-Erstkonfiguration</li>
+        <li style="color:var(--green);">✓ Wegberechnung im Webinterface</li>
+      </ul>
+    </div>
+    <div>
+      <div style="font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-family:'Courier New',monospace;margin-bottom:8px;">Kalibrierung</div>
+      <ul style="list-style:none;display:flex;flex-direction:column;gap:6px;font-size:14px;color:var(--muted);">
+        <li>Walzendurchmesser: <code>33,5 mm</code></li>
+        <li>Walzenumfang: <code>~105 mm</code></li>
+        <li>Steps/Umdrehung: <code>2011</code></li>
+        <li>Mikrostepping: <code>1/32</code></li>
+        <li>Genauigkeit: <code>±2 mm</code></li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2><span class="num">02</span>Benötigte Bauteile</h2>
+  <div class="parts-grid">
+    <div class="part-card">
+      <div class="part-icon">🧠</div>
+      <div>
+        <div class="part-name">NodeMCU ESP8266-12F</div>
+        <div class="part-detail">4 MB Flash, CH340 USB-Seriell</div>
+        <div class="part-link"><a href="https://www.amazon.de/dp/B0C3LTYZDN" target="_blank" rel="noopener">→ Amazon</a></div>
+      </div>
+      <div class="part-qty">1×</div>
+    </div>
+    <div class="part-card">
+      <div class="part-icon">⚙️</div>
+      <div>
+        <div class="part-name">DRV8825 Schrittmotortreiber</div>
+        <div class="part-detail">Mit Kühlkörper, Strom auf Motor abgestimmt</div>
+        <div class="part-link"><a href="https://www.amazon.de/dp/B0CCRXGKLV" target="_blank" rel="noopener">→ Amazon</a></div>
+      </div>
+      <div class="part-qty">1×</div>
+    </div>
+    <div class="part-card">
+      <div class="part-icon">🔧</div>
+      <div>
+        <div class="part-name">NEMA17 Schrittmotor</div>
+        <div class="part-detail">4-Draht, bipolarer Stepper</div>
+        <div class="part-link"><a href="https://www.amazon.de/dp/B0B38GX54H" target="_blank" rel="noopener">→ Amazon</a></div>
+      </div>
+      <div class="part-qty">1×</div>
+    </div>
+    <div class="part-card">
+      <div class="part-icon">💡</div>
+      <div>
+        <div class="part-name">Lichtschranke E18-D80NK</div>
+        <div class="part-detail">Hailege Infrarot-Sensor, einstellbare Reichweite</div>
+        <div class="part-link"><a href="https://www.amazon.de/dp/B07Y2Q3P4G" target="_blank" rel="noopener">→ Amazon (2er-Pack)</a></div>
+      </div>
+      <div class="part-qty">1×</div>
+    </div>
+    <div class="part-card">
+      <div class="part-icon">🔌</div>
+      <div>
+        <div class="part-name">Schrittmotor Erweiterungskarte</div>
+        <div class="part-detail">Shield für NodeMCU, DRV8825-kompatibel</div>
+        <div class="part-link"><a href="https://www.amazon.de/dp/B0FGMFZT5N" target="_blank" rel="noopener">→ Amazon</a></div>
+      </div>
+      <div class="part-qty">1×</div>
+    </div>
+    <div class="part-card">
+      <div class="part-icon">⚡</div>
+      <div>
+        <div class="part-name">Netzteil 12 V DC</div>
+        <div class="part-detail">Ausreichend für Motorstrom (mind. 1 A)</div>
+      </div>
+      <div class="part-qty">1×</div>
+    </div>
+    <div class="part-card">
+      <div class="part-icon">🔋</div>
+      <div>
+        <div class="part-name">Kondensator 100 µF / 35 V</div>
+        <div class="part-detail">Elektrolyt, Schutz für DRV8825 VMOT</div>
+      </div>
+      <div class="part-qty">1×</div>
+    </div>
+    <div class="part-card">
+      <div class="part-icon">🖨️</div>
+      <div>
+        <div class="part-name">3D-gedrucktes Gehäuse</div>
+        <div class="part-detail">Siehe MakerWorld-Link in Abschnitt 08</div>
+      </div>
+      <div class="part-qty">1×</div>
+    </div>
+  </div>
+  <div class="note danger" style="margin-top:16px;">
+    <strong>Wichtig:</strong> Den 100-µF-Kondensator unbedingt zwischen VMOT und GND des DRV8825 einbauen.
+    Spannungsspitzen beim Ein-/Ausschalten können den Treiber sonst dauerhaft beschädigen.
+  </div>
+</section>
+
+<section>
+  <h2><span class="num">03</span>Schaltplan &amp; Verdrahtung</h2>
+  <div class="diagram-wrap">
+    <canvas id="schematic" width="800" height="500"></canvas>
+    <div class="legend">
+      <div class="legend-item"><div class="legend-line" style="background:var(--wire-step)"></div>STEP (D2)</div>
+      <div class="legend-item"><div class="legend-line" style="background:var(--wire-dir)"></div>DIR (D1)</div>
+      <div class="legend-item"><div class="legend-line" style="background:var(--wire-ena)"></div>ENA (D3)</div>
+      <div class="legend-item"><div class="legend-line" style="background:var(--wire-3v3)"></div>3,3 V</div>
+      <div class="legend-item"><div class="legend-line" style="background:var(--wire-gnd)"></div>GND</div>
+      <div class="legend-item"><div class="legend-line" style="background:var(--wire-motor)"></div>12 V Motor</div>
+      <div class="legend-item"><div class="legend-line" style="background:var(--wire-coilA)"></div>Spule A</div>
+      <div class="legend-item"><div class="legend-line" style="background:var(--wire-coilB)"></div>Spule B</div>
+      <div class="legend-item"><div class="legend-line" style="background:var(--wire-sensor)"></div>Sensor</div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2><span class="num">04</span>Pin-Belegung</h2>
+  <h3>NodeMCU → DRV8825</h3>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>NodeMCU Pin</th>
+          <th>GPIO</th>
+          <th>DRV8825 Pin</th>
+          <th>Farbe</th>
+          <th>Funktion</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>D2</code></td>
+          <td><code>GPIO4</code></td>
+          <td><code>STEP</code></td>
+          <td><span class="dot" style="background:var(--wire-step)"></span>Blau</td>
+          <td>Schrittimpuls</td>
+        </tr>
+        <tr>
+          <td><code>D1</code></td>
+          <td><code>GPIO5</code></td>
+          <td><code>DIR</code></td>
+          <td><span class="dot" style="background:var(--wire-dir)"></span>Orange</td>
+          <td>Drehrichtung</td>
+        </tr>
+        <tr>
+          <td><code>D3</code></td>
+          <td><code>GPIO0</code></td>
+          <td><code>EN</code></td>
+          <td><span class="dot" style="background:var(--wire-ena)"></span>Lila</td>
+          <td>Motor Enable (LOW = aktiv)</td>
+        </tr>
+        <tr>
+          <td><code>3V3</code></td>
+          <td>—</td>
+          <td><code>M1, M2</code></td>
+          <td><span class="dot" style="background:var(--wire-3v3)"></span>Rot</td>
+          <td>Mikrostepping 1/32</td>
+        </tr>
+        <tr>
+          <td><code>GND</code></td>
+          <td>—</td>
+          <td><code>GND, M0</code></td>
+          <td><span class="dot" style="background:var(--wire-gnd)"></span>Schwarz</td>
+          <td>Masse + M0 LOW</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>NodeMCU → Lichtschranke E18-D80NK</h3>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>NodeMCU Pin</th><th>GPIO</th><th>Sensor Pin</th><th>Farbe</th><th>Funktion</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>D6</code></td>
+          <td><code>GPIO12</code></td>
+          <td><code>OUT / Signal</code></td>
+          <td><span class="dot" style="background:var(--wire-sensor)"></span>Grün</td>
+          <td>Digitales Ausgangssignal</td>
+        </tr>
+        <tr>
+          <td><code>3V3</code></td>
+          <td>—</td>
+          <td><code>VCC</code></td>
+          <td><span class="dot" style="background:var(--wire-3v3)"></span>Rot</td>
+          <td>Versorgungsspannung</td>
+        </tr>
+        <tr>
+          <td><code>GND</code></td>
+          <td>—</td>
+          <td><code>GND</code></td>
+          <td><span class="dot" style="background:var(--wire-gnd)"></span>Schwarz</td>
+          <td>Masse</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>DRV8825 → NEMA17 Schrittmotor</h3>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>DRV8825 Pin</th><th>Motor-Spule</th><th>Farbe</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>A1</code></td><td>Spule A (+)</td><td><span class="dot" style="background:var(--wire-coilA)"></span>Grün</td></tr>
+        <tr><td><code>A2</code></td><td>Spule A (−)</td><td><span class="dot" style="background:var(--wire-coilA);opacity:.6"></span>Dunkelgrün</td></tr>
+        <tr><td><code>B1</code></td><td>Spule B (+)</td><td><span class="dot" style="background:var(--wire-coilB)"></span>Türkis</td></tr>
+        <tr><td><code>B2</code></td><td>Spule B (−)</td><td><span class="dot" style="background:var(--wire-coilB);opacity:.6"></span>Dunkeltürkis</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>DRV8825 Stromversorgung (12 V)</h3>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>DRV8825 Pin</th><th>Netzteil</th><th>Farbe</th><th>Hinweis</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>VMOT</code></td>
+          <td>+12 V</td>
+          <td><span class="dot" style="background:var(--wire-motor)"></span>Gelb/Amber</td>
+          <td>100-µF-Kondensator zwischen VMOT und GND!</td>
+        </tr>
+        <tr>
+          <td><code>GND</code> (Motor)</td>
+          <td>GND</td>
+          <td><span class="dot" style="background:var(--wire-gnd)"></span>Schwarz</td>
+          <td>Gemeinsame Masse mit NodeMCU GND verbinden</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note danger">
+    <strong>Achtung Strapping-Pins:</strong> Den Sensor <em>nicht</em> an D8 (GPIO15) anschließen!
+    GPIO15 muss beim Booten LOW sein. Ein ausgelöster Sensor verhindert den Bootloader-Zugang
+    und macht das Flashen ohne manuellen Reset unmöglich.
+  </div>
+</section>
+
+<section>
+  <h2><span class="num">05</span>Mikrostepping DRV8825</h2>
+  <p style="color:var(--muted);margin-bottom:16px;font-size:14px;">
+    Die Microstepping-Pins M0, M1 und M2 bestimmen die Schrittauflösung.
+    Für dieses Projekt wird <strong style="color:var(--accent);">1/32 Mikroschritt</strong> verwendet
+    (Low / High / High), was bei einem 200-Schritt-Motor 6400 Halbschritte pro Umdrehung ergibt —
+    kalibriert auf <code>2011 Steps/U</code> für diese spezifische Walzen-/Band-Kombination.
+  </p>
+  <div class="ms-grid">
+    <div class="ms-cell head">M0</div>
+    <div class="ms-cell head">M1</div>
+    <div class="ms-cell head">M2</div>
+    <div class="ms-cell head">Modus</div>
+
+    <div class="ms-cell"><span class="pin-lo">LOW</span></div>
+    <div class="ms-cell"><span class="pin-lo">LOW</span></div>
+    <div class="ms-cell"><span class="pin-lo">LOW</span></div>
+    <div class="ms-cell">Vollschritt (200/U)</div>
+
+    <div class="ms-cell"><span class="pin-hi">HIGH</span></div>
+    <div class="ms-cell"><span class="pin-lo">LOW</span></div>
+    <div class="ms-cell"><span class="pin-lo">LOW</span></div>
+    <div class="ms-cell">1/2 (400/U)</div>
+
+    <div class="ms-cell"><span class="pin-lo">LOW</span></div>
+    <div class="ms-cell"><span class="pin-hi">HIGH</span></div>
+    <div class="ms-cell"><span class="pin-lo">LOW</span></div>
+    <div class="ms-cell">1/4 (800/U)</div>
+
+    <div class="ms-cell"><span class="pin-hi">HIGH</span></div>
+    <div class="ms-cell"><span class="pin-hi">HIGH</span></div>
+    <div class="ms-cell"><span class="pin-lo">LOW</span></div>
+    <div class="ms-cell">1/8 (1600/U)</div>
+
+    <div class="ms-cell"><span class="pin-lo">LOW</span></div>
+    <div class="ms-cell"><span class="pin-lo">LOW</span></div>
+    <div class="ms-cell"><span class="pin-hi">HIGH</span></div>
+    <div class="ms-cell">1/16 (3200/U)</div>
+
+    <div class="ms-cell last-row active"><span class="pin-lo">LOW</span> ✓</div>
+    <div class="ms-cell last-row active"><span class="pin-hi">HIGH</span> ✓</div>
+    <div class="ms-cell last-row active"><span class="pin-hi">HIGH</span> ✓</div>
+    <div class="ms-cell last-row active">1/32 — verwendet</div>
+  </div>
+</section>
+
+<section>
+  <h2><span class="num">06</span>Schritt-für-Schritt Verdrahtung</h2>
+  <div class="steps">
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-body">
+        <div class="step-title">NodeMCU und DRV8825 auf Breadboard oder in Gehäuse platzieren</div>
+        <div class="step-desc">Darauf achten, dass der DRV8825 noch nicht an die 12-V-Versorgung angeschlossen ist. Kühlkörper auf DRV8825 aufkleben.</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-body">
+        <div class="step-title">Mikrostepping einstellen</div>
+        <div class="step-desc">
+          DRV8825 M0 → GND, M1 → 3V3, M2 → 3V3 für 1/32 Mikroschritt.<br>
+          <code>M0 = LOW &nbsp;·&nbsp; M1 = HIGH &nbsp;·&nbsp; M2 = HIGH</code>
+        </div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-body">
+        <div class="step-title">Steuerleitungen verbinden (NodeMCU → DRV8825)</div>
+        <div class="step-desc">
+          <code>D2 → STEP</code> &nbsp;·&nbsp; <code>D1 → DIR</code> &nbsp;·&nbsp; <code>D3 → EN</code><br>
+          Gemeinsame GND-Leitung von NodeMCU GND zu DRV8825 GND (Logik-Seite).
+        </div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">4</div>
+      <div class="step-body">
+        <div class="step-title">100-µF-Kondensator an VMOT anschließen</div>
+        <div class="step-desc">Plus-Pol an VMOT, Minus-Pol an GND (Motor-Seite). Unbedingt vor dem 12-V-Anschluss erledigen!</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">5</div>
+      <div class="step-body">
+        <div class="step-title">Schrittmotor anschließen</div>
+        <div class="step-desc">
+          Spule A: <code>A1</code> und <code>A2</code> des DRV8825.<br>
+          Spule B: <code>B1</code> und <code>B2</code> des DRV8825.<br>
+          Dreht der Motor falsch, einfach A1/A2 oder B1/B2 tauschen.
+        </div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">6</div>
+      <div class="step-body">
+        <div class="step-title">Lichtschranke anschließen</div>
+        <div class="step-desc">
+          <code>D6 (GPIO12) → OUT/Signal</code><br>
+          Nicht D8 (GPIO15) verwenden — dieser Strapping-Pin verhindert bei ausgelöstem Sensor den Bootloader-Zugang!
+        </div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">7</div>
+      <div class="step-body">
+        <div class="step-title">12-V-Versorgung anschließen</div>
+        <div class="step-desc">
+          <code>+12 V → VMOT</code> &nbsp;·&nbsp; <code>GND → DRV8825 GND (Motor)</code><br>
+          GND des Netzteils mit GND des NodeMCU verbinden (gemeinsame Masse).
+        </div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">8</div>
+      <div class="step-body">
+        <div class="step-title">NodeMCU per USB flashen und testen</div>
+        <div class="step-desc">Seriellen Monitor öffnen (115200 Baud), IP-Adresse ablesen, Webinterface im Browser aufrufen und manuellen Start testen.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2><span class="num">07</span>Software &amp; Firmware</h2>
+  <div class="card">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+      <div>
+        <h3 style="margin-top:0;">Board-Einstellungen (Arduino IDE)</h3>
+        <table style="font-size:13px;">
+          <tr><td style="color:var(--muted);padding:4px 0;">Board</td><td><code>Generic ESP8266 Module</code></td></tr>
+          <tr><td style="color:var(--muted);padding:4px 0;">Flash Size</td><td><code>4MB (FS: 2MB, OTA: ~1MB)</code></td></tr>
+          <tr><td style="color:var(--muted);padding:4px 0;">Upload Speed</td><td><code>115200</code></td></tr>
+          <tr><td style="color:var(--muted);padding:4px 0;">Reset Method</td><td><code>dtr (nodemcu)</code></td></tr>
+          <tr><td style="color:var(--muted);padding:4px 0;">CPU Freq.</td><td><code>80 MHz</code></td></tr>
+        </table>
+      </div>
+      <div>
+        <h3 style="margin-top:0;">arduino-cli Flash</h3>
+        <div style="background:var(--surface2);border-radius:6px;padding:12px;font-family:'Courier New',monospace;font-size:12px;color:var(--muted);">
+          <div style="color:var(--muted);margin-bottom:6px;"># Kompilieren</div>
+          <div style="color:var(--blue);margin-bottom:12px;">arduino-cli compile --fqbn esp8266:esp8266:generic foerderband_web</div>
+          <div style="color:var(--muted);margin-bottom:6px;"># Hochladen</div>
+          <div style="color:var(--blue);margin-bottom:12px;">arduino-cli upload --fqbn esp8266:esp8266:generic --port COM3 foerderband_web</div>
+          <div style="color:var(--muted);margin-bottom:6px;"># OTA per WLAN</div>
+          <div style="color:var(--blue);">arduino-cli upload --fqbn esp8266:esp8266:generic --port foerderband.local foerderband_web</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="note tip">
+    <strong>Tipp:</strong> Firmware-Updates können nach der Ersteinrichtung bequem über den Browser-Tab „Firmware" im Webinterface eingespielt werden — kein PC-Tool, kein USB-Kabel nötig.
+  </div>
+  <h3>Changelog</h3>
+  <div class="changelog">
+    <div class="cl-entry">
+      <div class="cl-ver">v1.0.0</div>
+      <ul class="cl-items">
+        <li>Erstveröffentlichung</li>
+        <li>Webinterface mit Tabs (Einstellungen / Firmware)</li>
+        <li>EEPROM-Persistenz für WLAN &amp; Motoreinstellungen</li>
+        <li>Captive Portal für WLAN-Erstkonfiguration</li>
+        <li>OTA-Update per Browser und ArduinoOTA</li>
+        <li>Wegberechnung aus Walzendurchmesser</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2><span class="num">08</span>3D-Druck</h2>
+  <p style="color:var(--muted);margin-bottom:20px;font-size:14px;">
+    Das Förderband-Chassis ist nicht selbst konstruiert — es basiert auf einem ausgezeichneten
+    Open-Source-Modell von MakerWorld. Vielen Dank an den ursprünglichen Designer!
+  </p>
+  <a class="mw-card" href="https://makerworld.com/de/models/1660640-fully-modular-motorized-conveyor-system?from=search#profileId-1756686" target="_blank" rel="noopener">
+    <div class="mw-icon">🖨️</div>
+    <div>
+      <div class="mw-label">MakerWorld · 3D-Modell</div>
+      <div class="mw-title">Fully Modular Motorized Conveyor System</div>
+      <div class="mw-desc">Modulares, motorisiertes Förderband-System — perfekte Basis für diesen Poop-Chute-Aufbau. In schwarz/gelb gedruckt passend zum Bambu Lab A1 Mini.</div>
+    </div>
+  </a>
+</section>
+
+<footer>
+  <p>ESP-Förderband · MIT Lizenz · <a href="https://github.com/samson2803/ESP-Foerderband" target="_blank">github.com/samson2803/ESP-Foerderband</a></p>
+  <p style="margin-top:6px;">Dokumentation erstellt mit Claude Code</p>
+</footer>
+
+<script>
+(function() {
+  const canvas = document.getElementById('schematic');
+  const ctx = canvas.getContext('2d');
+  const W = 800, H = 500;
+
+  // Read CSS vars for theme-aware colors
+  const style = getComputedStyle(document.documentElement);
+  const get = v => style.getPropertyValue(v).trim();
+
+  const C = {
+    bg:      get('--surface'),
+    surface: get('--surface2'),
+    border:  get('--border'),
+    text:    get('--text'),
+    muted:   get('--muted'),
+    accent:  get('--accent'),
+    step:    get('--wire-step'),
+    dir:     get('--wire-dir'),
+    ena:     get('--wire-ena'),
+    v33:     get('--wire-3v3'),
+    gnd:     get('--wire-gnd'),
+    motor:   get('--wire-motor'),
+    coilA:   get('--wire-coilA'),
+    coilB:   get('--wire-coilB'),
+    sensor:  get('--wire-sensor'),
+  };
+
+  ctx.fillStyle = C.bg;
+  ctx.fillRect(0, 0, W, H);
+
+  function drawBox(x, y, w, h, title, subtitle) {
+    ctx.fillStyle = C.surface;
+    ctx.strokeStyle = C.border;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.roundRect(x, y, w, h, 6);
+    ctx.fill(); ctx.stroke();
+
+    ctx.fillStyle = C.accent;
+    ctx.fillRect(x, y, w, 28);
+    ctx.beginPath();
+    ctx.roundRect(x, y, w, 28, [6, 6, 0, 0]);
+    ctx.fill();
+
+    ctx.fillStyle = '#0d1117';
+    ctx.font = 'bold 11px Courier New';
+    ctx.textAlign = 'center';
+    ctx.fillText(title, x + w/2, y + 17);
+
+    if (subtitle) {
+      ctx.fillStyle = C.muted;
+      ctx.font = '10px system-ui';
+      ctx.fillText(subtitle, x + w/2, y + 42);
+    }
+  }
+
+  function pin(x, y, label, align, color) {
+    ctx.fillStyle = color || C.muted;
+    ctx.font = '10px Courier New';
+    ctx.textAlign = align;
+    ctx.fillText(label, x + (align === 'left' ? 5 : -5), y + 4);
+    ctx.fillStyle = color || C.border;
+    ctx.beginPath();
+    ctx.arc(x, y, 3, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  function wire(x1, y1, x2, y2, color, dashed) {
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    if (dashed) ctx.setLineDash([4, 3]);
+    else ctx.setLineDash([]);
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    // Route with right-angle bends via midpoint
+    const mx = (x1 + x2) / 2;
+    ctx.lineTo(mx, y1);
+    ctx.lineTo(mx, y2);
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  function wireDirect(points, color) {
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.setLineDash([]);
+    ctx.beginPath();
+    ctx.moveTo(points[0][0], points[0][1]);
+    for (let i = 1; i < points.length; i++) ctx.lineTo(points[i][0], points[i][1]);
+    ctx.stroke();
+  }
+
+  // ── Component positions ──
+  const mcu = {x: 28, y: 55, w: 138, h: 320};
+  const drv = {x: 320, y: 105, w: 148, h: 240};
+  const mot = {x: 575, y: 140, w: 120, h: 160};
+  const sen = {x: 575, y: 28, w: 120, h: 80};
+  const psu = {x: 320, y: 400, w: 148, h: 70};
+
+  // Draw boxes
+  drawBox(mcu.x, mcu.y, mcu.w, mcu.h, 'NodeMCU', 'ESP8266');
+  drawBox(drv.x, drv.y, drv.w, drv.h, 'DRV8825', 'Schrittmotortreiber');
+  drawBox(mot.x, mot.y, mot.w, mot.h, 'NEMA17', 'Schrittmotor');
+  drawBox(sen.x, sen.y, sen.w, sen.h, 'Lichtschranke', '');
+  drawBox(psu.x, psu.y, psu.w, psu.h, '12V Netzteil', '');
+
+  // ── MCU right-side pins (x = mcu.x + mcu.w) ──
+  const mcuR = mcu.x + mcu.w;
+  const pins_mcu = {
+    d1:   mcu.y + 80,
+    d2:   mcu.y + 108,
+    d3:   mcu.y + 136,
+    v33a: mcu.y + 164,
+    v33b: mcu.y + 192,
+    gnd:  mcu.y + 220,
+    d6:   mcu.y + 258,
+  };
+
+  pin(mcuR, pins_mcu.d1,   'D1 DIR',  'right', C.dir);
+  pin(mcuR, pins_mcu.d2,   'D2 STEP', 'right', C.step);
+  pin(mcuR, pins_mcu.d3,   'D3 ENA',  'right', C.ena);
+  pin(mcuR, pins_mcu.v33a, '3V3 (M1)','right', C.v33);
+  pin(mcuR, pins_mcu.v33b, '3V3 (M2)','right', C.v33);
+  pin(mcuR, pins_mcu.gnd,  'GND',     'right', C.gnd);
+  pin(mcuR, pins_mcu.d6,   'D6 SEN',  'right', C.sensor);
+
+  // ── USB label ──
+  ctx.fillStyle = C.muted;
+  ctx.font = '10px system-ui';
+  ctx.textAlign = 'center';
+  ctx.fillText('USB', mcu.x + mcu.w/2, mcu.y + mcu.h - 14);
+
+  // ── DRV left-side pins ──
+  const drvL = drv.x;
+  const pins_drv_l = {
+    dir:  drv.y + 65,
+    step: drv.y + 90,
+    en:   drv.y + 115,
+    m1:   drv.y + 140,
+    m2:   drv.y + 165,
+    gnd:  drv.y + 190,
+  };
+  pin(drvL, pins_drv_l.dir,  'DIR',  'left', C.dir);
+  pin(drvL, pins_drv_l.step, 'STEP', 'left', C.step);
+  pin(drvL, pins_drv_l.en,   'EN',   'left', C.ena);
+  pin(drvL, pins_drv_l.m1,   'M1',   'left', C.v33);
+  pin(drvL, pins_drv_l.m2,   'M2',   'left', C.v33);
+  pin(drvL, pins_drv_l.gnd,  'GND',  'left', C.gnd);
+
+  // ── DRV right-side pins ──
+  const drvR = drv.x + drv.w;
+  const pins_drv_r = {
+    a1:   drv.y + 65,
+    a2:   drv.y + 92,
+    b1:   drv.y + 119,
+    b2:   drv.y + 146,
+    vmot: drv.y + 185,
+    gndm: drv.y + 210,
+  };
+  pin(drvR, pins_drv_r.a1,   'A1',   'right', C.coilA);
+  pin(drvR, pins_drv_r.a2,   'A2',   'right', C.coilA);
+  pin(drvR, pins_drv_r.b1,   'B1',   'right', C.coilB);
+  pin(drvR, pins_drv_r.b2,   'B2',   'right', C.coilB);
+  pin(drvR, pins_drv_r.vmot, 'VMOT', 'right', C.motor);
+  pin(drvR, pins_drv_r.gndm, 'GND',  'right', C.gnd);
+
+  // ── Motor pins ──
+  const motL = mot.x;
+  pin(motL, mot.y + 60,  'A+', 'left', C.coilA);
+  pin(motL, mot.y + 87,  'A−', 'left', C.coilA);
+  pin(motL, mot.y + 114, 'B+', 'left', C.coilB);
+  pin(motL, mot.y + 141, 'B−', 'left', C.coilB);
+
+  // ── Sensor pins ──
+  const senL = sen.x;
+  pin(senL, sen.y + 34, 'OUT', 'left', C.sensor);
+  pin(senL, sen.y + 52, 'VCC', 'left', C.v33);
+  pin(senL, sen.y + 70, 'GND', 'left', C.gnd);
+
+  // ── PSU pins ──
+  pin(psu.x + 40, psu.y, '+12V', 'left', C.motor);
+  pin(psu.x + 95, psu.y, 'GND',  'left', C.gnd);
+
+  // ── Wires: MCU → DRV ──
+  wire(mcuR, pins_mcu.d1,   drvL, pins_drv_l.dir,  C.dir);
+  wire(mcuR, pins_mcu.d2,   drvL, pins_drv_l.step, C.step);
+  wire(mcuR, pins_mcu.d3,   drvL, pins_drv_l.en,   C.ena);
+  wire(mcuR, pins_mcu.v33a, drvL, pins_drv_l.m1,   C.v33);
+  wire(mcuR, pins_mcu.v33b, drvL, pins_drv_l.m2,   C.v33);
+  wire(mcuR, pins_mcu.gnd,  drvL, pins_drv_l.gnd,  C.gnd);
+
+  // ── Wire: MCU D6 → Sensor OUT ──
+  wireDirect([[mcuR, pins_mcu.d6],[540, pins_mcu.d6],[540, sen.y + 34],[senL, sen.y + 34]], C.sensor);
+
+  // ── Wire: 3V3 → Sensor VCC ──
+  wireDirect([[mcuR, pins_mcu.v33a],[530, pins_mcu.v33a],[530, sen.y + 52],[senL, sen.y + 52]], C.v33, true);
+
+  // ── Wire: GND → Sensor GND ──
+  wireDirect([[mcuR, pins_mcu.gnd],[520, pins_mcu.gnd],[520, sen.y + 70],[senL, sen.y + 70]], C.gnd, true);
+
+  // ── Wires: DRV → Motor ──
+  wire(drvR, pins_drv_r.a1, motL, mot.y + 60,  C.coilA);
+  wire(drvR, pins_drv_r.a2, motL, mot.y + 87,  C.coilA);
+  wire(drvR, pins_drv_r.b1, motL, mot.y + 114, C.coilB);
+  wire(drvR, pins_drv_r.b2, motL, mot.y + 141, C.coilB);
+
+  // ── Wires: PSU → DRV ──
+  wireDirect([[psu.x + 40, psu.y],[psu.x + 40, pins_drv_r.vmot],[drvR, pins_drv_r.vmot]], C.motor);
+  wireDirect([[psu.x + 95, psu.y],[psu.x + 95, pins_drv_r.gndm],[drvR, pins_drv_r.gndm]], C.gnd);
+
+  // ── Capacitor symbol near VMOT ──
+  const cx = 510, cy = pins_drv_r.vmot;
+  ctx.strokeStyle = C.motor;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(cx - 5, cy - 10); ctx.lineTo(cx - 5, cy + 10);
+  ctx.moveTo(cx + 5, cy - 10); ctx.lineTo(cx + 5, cy + 10);
+  ctx.stroke();
+  ctx.fillStyle = C.muted;
+  ctx.font = '9px Courier New';
+  ctx.textAlign = 'center';
+  ctx.fillText('100µF', cx, cy + 22);
+
+  // Connect cap to wire segment
+  ctx.strokeStyle = C.motor;
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(cx - 5, cy); ctx.lineTo(cx - 22, cy);
+  ctx.moveTo(cx + 5, cy); ctx.lineTo(cx + 16, cy);
+  ctx.stroke();
+  // Cap to GND
+  ctx.strokeStyle = C.gnd;
+  ctx.beginPath();
+  ctx.moveTo(cx, cy + 10); ctx.lineTo(cx, cy + 28);
+  ctx.moveTo(cx - 6, cy + 28); ctx.lineTo(cx + 6, cy + 28);
+  ctx.moveTo(cx - 3, cy + 31); ctx.lineTo(cx + 3, cy + 31);
+  ctx.stroke();
+
+})();
+</script>
