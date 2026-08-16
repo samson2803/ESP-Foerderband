@@ -23,7 +23,7 @@
   GitHub: https://github.com/...
 */
 
-#define FIRMWARE_VERSION "1.0.0"
+#define FIRMWARE_VERSION "1.1.0"
 
 #include <ESP8266WiFi.h>
 #include <ESP8266WebServer.h>
@@ -260,27 +260,70 @@ void handleWifiReset() {
   ESP.restart();
 }
 
+// Dieser String muss in jeder gueltigen Foerderband-Firmware enthalten sein.
+const char FW_MAGIC[] = "FOERDERBAND_FW_MAGIC";
+static bool    uploadMagicOk   = false;
+static bool    uploadMagicDone = false;
+static uint8_t magicBuf[512];
+static size_t  magicBufLen = 0;
+
 void handleFirmwareUpdate() {
   server.sendHeader("Connection", "close");
-  if (Update.hasError()) {
+  if (!uploadMagicOk) {
+    server.send(400, "text/plain", "Falsche Firmware: Magic nicht gefunden. Nur Foerderband-Firmware kann per Browser hochgeladen werden.");
+  } else if (Update.hasError()) {
     server.send(500, "text/plain", "Update fehlgeschlagen");
   } else {
     server.send(200, "text/plain", "OK");
+    delay(500);
+    ESP.restart();
   }
-  delay(500);
-  ESP.restart();
 }
 
 void handleFirmwareUpload() {
   HTTPUpload& upload = server.upload();
+
   if (upload.status == UPLOAD_FILE_START) {
     Serial.printf("HTTP OTA: %s\n", upload.filename.c_str());
+    uploadMagicOk   = false;
+    uploadMagicDone = false;
+    magicBufLen     = 0;
     Update.begin((size_t)0xFFFFFFFF);
+
   } else if (upload.status == UPLOAD_FILE_WRITE) {
-    Update.write(upload.buf, upload.currentSize);
+    // Magic nur einmal in den ersten 512 Byte suchen
+    if (!uploadMagicDone) {
+      size_t toCopy = min(upload.currentSize, sizeof(magicBuf) - magicBufLen);
+      memcpy(magicBuf + magicBufLen, upload.buf, toCopy);
+      magicBufLen += toCopy;
+      if (magicBufLen >= sizeof(magicBuf) || upload.totalSize <= magicBufLen) {
+        uploadMagicDone = true;
+        // mmap-freie Suche: strstr auf Null-terminierten Puffer nicht moeglich,
+        // daher manuell suchen (Puffer kann Null-Bytes enthalten)
+        const char* needle = FW_MAGIC;
+        size_t nlen = strlen(needle);
+        uploadMagicOk = false;
+        for (size_t i = 0; i + nlen <= magicBufLen; i++) {
+          if (memcmp(magicBuf + i, needle, nlen) == 0) {
+            uploadMagicOk = true;
+            break;
+          }
+        }
+        if (!uploadMagicOk) {
+          Serial.println("HTTP OTA: Firmware-Magic nicht gefunden – Abbruch");
+          Update.end(false);
+        }
+      }
+    }
+    if (uploadMagicOk) {
+      Update.write(upload.buf, upload.currentSize);
+    }
+
   } else if (upload.status == UPLOAD_FILE_END) {
-    Update.end(true);
-    Serial.printf("HTTP OTA fertig: %u Bytes\n", upload.totalSize);
+    if (uploadMagicOk) {
+      Update.end(true);
+      Serial.printf("HTTP OTA fertig: %u Bytes\n", upload.totalSize);
+    }
   }
 }
 
