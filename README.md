@@ -3,7 +3,7 @@
 Förderband-Steuerung mit NodeMCU ESP8266, DRV8825 Schrittmotortreiber und WLAN-Webinterface.
 
 Ursprünglich als automatischer Poop-Chute für den **Bambu Lab A1 Mini** entwickelt:
-Der Druckkopf fährt beim Filamentwechsel auf die Y-Achsen-Endposition — eine Lichtschranke erkennt
+Der Druckkopf fährt beim Filamentwechsel auf die X-Achsen-Endposition — eine Lichtschranke erkennt
 dies und transportiert den Purge-Abfall automatisch in einen Schacht/Mülleimer.
 
 ![Förderband](foerderband.jpg)
