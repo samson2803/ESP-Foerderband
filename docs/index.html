@@ -877,7 +877,44 @@
 </section>
 
 <section>
-  <h2><span class="num">08</span>3D-Druck</h2>
+  <h2><span class="num">08</span>Auslöselogik &amp; Retrigger-Verhalten</h2>
+  <p style="color:var(--muted);margin-bottom:16px;">
+    Die Steuerung nutzt <strong style="color:var(--text);">Flankenerkennung</strong> (LOW&nbsp;→&nbsp;HIGH) statt
+    dauerhafter Zustandsabfrage. Das verhindert, dass ein dauerhaft ausgelöster Sensor das Band
+    endlos laufen lässt.
+  </p>
+  <div class="card" style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+    <div>
+      <h3 style="margin-top:0;">Auslösebedingungen</h3>
+      <ul style="list-style:none;display:flex;flex-direction:column;gap:8px;font-size:14px;padding:0;margin:0;color:var(--muted);">
+        <li><span style="color:var(--green);">✓</span>&nbsp; Sensor wechselt von <code>LOW → HIGH</code></li>
+        <li><span style="color:var(--green);">✓</span>&nbsp; Band steht gerade still (<code>!isRunning</code>)</li>
+        <li><span style="color:var(--red);">✗</span>&nbsp; Während Bandlauf: Auslösung ignoriert</li>
+        <li><span style="color:var(--red);">✗</span>&nbsp; Sensor bleibt HIGH: kein erneuter Start</li>
+      </ul>
+    </div>
+    <div>
+      <h3 style="margin-top:0;">Minimaler Retrigger-Abstand</h3>
+      <p style="font-size:14px;color:var(--muted);margin-bottom:10px;">
+        Das Band muss vollständig gelaufen sein <em>und</em> der Sensor muss zwischendurch auf LOW
+        gegangen sein (Druckkopf weggefahren), bevor eine neue Auslösung möglich ist.
+      </p>
+      <div style="background:var(--surface2);border-radius:6px;padding:12px;font-family:'Courier New',monospace;font-size:12px;color:var(--muted);">
+        <div>2011 Steps/U × eingest. Umdrehungen</div>
+        <div>× 2 × Schrittdelay (µs)</div>
+        <div style="border-top:1px solid var(--border);margin-top:6px;padding-top:6px;color:var(--accent);">≈ 3,2 Sek. bei Standardeinstellung (10 U, 800 µs)</div>
+      </div>
+    </div>
+  </div>
+  <div class="note tip" style="margin-top:16px;">
+    <strong>Hinweis:</strong> Beim Bambu Lab A1 Mini vergehen zwischen zwei Filamentwechseln
+    typischerweise mehrere Minuten — der Mindestabstand von ca. 3 Sekunden ist in der Praxis
+    kein limitierender Faktor.
+  </div>
+</section>
+
+<section>
+  <h2><span class="num">09</span>3D-Druck</h2>
   <p style="color:var(--muted);margin-bottom:20px;font-size:14px;">
     Das Förderband-Chassis ist nicht selbst konstruiert — es basiert auf einem ausgezeichneten
     Open-Source-Modell von MakerWorld. Vielen Dank an den ursprünglichen Designer!
