@@ -60,9 +60,18 @@ dies und transportiert den Purge-Abfall automatisch in einen Schacht/Mülleimer.
 | Einstellung | Wert |
 |---|---|
 | Board | Generic ESP8266 Module |
-| Flash Size | 4MB |
+| Flash Size | **1MB (FS:64KB OTA:~470KB)** — siehe Warnung |
 | Upload Speed | 115200 |
 | Reset Method | dtr (nodemcu) |
+
+> **Flash Size nicht ändern.** Der EEPROM-Sektor liegt beim ESP8266 am Ende des
+> *konfigurierten* Flash-Bereichs. Eine andere Flash-Size verschiebt ihn — die Firmware
+> findet dann weder die WLAN-Zugangsdaten noch die Motoreinstellungen und fällt beim
+> nächsten Start in den AP-Modus („Foerderband-Setup"). Das Gerät ist dabei nicht
+> beschädigt, muss aber über das Portal neu eingerichtet werden.
+>
+> `1M64` ist zugleich der Standard von `arduino-cli` für `esp8266:esp8266:generic`,
+> ein `--fqbn esp8266:esp8266:generic` ohne Zusatz ist also korrekt.
 
 ### Flashen
 

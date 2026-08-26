@@ -28,7 +28,7 @@
   GitHub: https://github.com/...
 */
 
-#define FIRMWARE_VERSION "1.3.0"
+#define FIRMWARE_VERSION "1.3.1"
 
 #include <ESP8266WiFi.h>
 #include <ESP8266WebServer.h>
@@ -302,10 +302,63 @@ void handleWifiReset() {
 
 // Dieser String muss in jeder gueltigen Foerderband-Firmware enthalten sein.
 const char FW_MAGIC[] = "FOERDERBAND_FW_MAGIC";
-static bool    uploadMagicOk   = false;
-static bool    uploadMagicDone = false;
-static uint8_t magicBuf[512];
-static size_t  magicBufLen = 0;
+static const size_t MAGIC_LEN = sizeof(FW_MAGIC) - 1;
+
+static bool    uploadMagicOk = false;
+// Die letzten Bytes des vorherigen Blocks - sonst rutscht ein Treffer genau auf
+// der Blockgrenze durch.
+static uint8_t magicTail[MAGIC_LEN - 1];
+static size_t  magicTailLen = 0;
+
+static bool magicInBuffer(const uint8_t* data, size_t len) {
+  if (len < MAGIC_LEN) return false;
+  for (size_t i = 0; i + MAGIC_LEN <= len; i++) {
+    if (memcmp(data + i, FW_MAGIC, MAGIC_LEN) == 0) return true;
+  }
+  return false;
+}
+
+// Sucht den Magic-String im laufenden Upload.
+//
+// Wichtig: FW_MAGIC liegt als const char[] im .rodata-Abschnitt, also weit
+// hinten im Image (bei v1.3.x rund 356 kB tief). Ein Blick auf die ersten Bytes
+// findet ihn nie - es muss der ganze Strom durchsucht werden. Genau daran ist
+// der Browser-Upload bis v1.3.0 gescheitert.
+static void magicScan(const uint8_t* data, size_t len) {
+  if (uploadMagicOk || len == 0) return;
+
+  // 1. Treffer, der ueber die Blockgrenze reicht
+  if (magicTailLen > 0) {
+    uint8_t bridge[2 * (MAGIC_LEN - 1)];
+    size_t head = min(len, MAGIC_LEN - 1);
+    memcpy(bridge, magicTail, magicTailLen);
+    memcpy(bridge + magicTailLen, data, head);
+    if (magicInBuffer(bridge, magicTailLen + head)) {
+      uploadMagicOk = true;
+      return;
+    }
+  }
+
+  // 2. Treffer innerhalb dieses Blocks
+  if (magicInBuffer(data, len)) {
+    uploadMagicOk = true;
+    return;
+  }
+
+  // 3. Ueberhang fuer den naechsten Block merken
+  if (len >= MAGIC_LEN - 1) {
+    memcpy(magicTail, data + len - (MAGIC_LEN - 1), MAGIC_LEN - 1);
+    magicTailLen = MAGIC_LEN - 1;
+  } else {
+    size_t drop = (magicTailLen + len > MAGIC_LEN - 1)
+                  ? (magicTailLen + len) - (MAGIC_LEN - 1)
+                  : 0;
+    memmove(magicTail, magicTail + drop, magicTailLen - drop);
+    magicTailLen -= drop;
+    memcpy(magicTail + magicTailLen, data, len);
+    magicTailLen += len;
+  }
+}
 
 void handleFirmwareUpdate() {
   server.sendHeader("Connection", "close");
@@ -325,44 +378,23 @@ void handleFirmwareUpload() {
 
   if (upload.status == UPLOAD_FILE_START) {
     Serial.printf("HTTP OTA: %s\n", upload.filename.c_str());
-    uploadMagicOk   = false;
-    uploadMagicDone = false;
-    magicBufLen     = 0;
+    uploadMagicOk = false;
+    magicTailLen  = 0;
     Update.begin((size_t)0xFFFFFFFF);
 
   } else if (upload.status == UPLOAD_FILE_WRITE) {
-    // Magic nur einmal in den ersten 512 Byte suchen
-    if (!uploadMagicDone) {
-      size_t toCopy = min(upload.currentSize, sizeof(magicBuf) - magicBufLen);
-      memcpy(magicBuf + magicBufLen, upload.buf, toCopy);
-      magicBufLen += toCopy;
-      if (magicBufLen >= sizeof(magicBuf) || upload.totalSize <= magicBufLen) {
-        uploadMagicDone = true;
-        // mmap-freie Suche: strstr auf Null-terminierten Puffer nicht moeglich,
-        // daher manuell suchen (Puffer kann Null-Bytes enthalten)
-        const char* needle = FW_MAGIC;
-        size_t nlen = strlen(needle);
-        uploadMagicOk = false;
-        for (size_t i = 0; i + nlen <= magicBufLen; i++) {
-          if (memcmp(magicBuf + i, needle, nlen) == 0) {
-            uploadMagicOk = true;
-            break;
-          }
-        }
-        if (!uploadMagicOk) {
-          Serial.println("HTTP OTA: Firmware-Magic nicht gefunden – Abbruch");
-          Update.end(false);
-        }
-      }
-    }
-    if (uploadMagicOk) {
-      Update.write(upload.buf, upload.currentSize);
-    }
+    magicScan(upload.buf, upload.currentSize);
+    Update.write(upload.buf, upload.currentSize);
 
   } else if (upload.status == UPLOAD_FILE_END) {
     if (uploadMagicOk) {
       Update.end(true);
       Serial.printf("HTTP OTA fertig: %u Bytes\n", upload.totalSize);
+    } else {
+      // Der Magic sitzt am Ende des Images, das Urteil steht also erst jetzt fest.
+      // Update.end(false) schreibt nichts fest - die laufende Firmware bleibt.
+      Update.end(false);
+      Serial.println("HTTP OTA: Firmware-Magic nicht gefunden - verworfen");
     }
   }
 }
@@ -370,10 +402,12 @@ void handleFirmwareUpload() {
 // ---------- Motorsteuerung ----------
 
 // Bandweg pro Umdrehung = PI * Walzendurchmesser -> daraus die Schritte je Millimeter.
+// Unter 1 mm gibt es keinen sinnvollen Walzendurchmesser (das ist auch die untere
+// Grenze in /api/config). Die Abfrage faengt zugleich einen kaputten EEPROM-Wert ab:
+// bei 0 oder einer denormalen Zahl kaeme sonst inf heraus.
 float stepsPerMm() {
-  float umfang = PI * walzendurchmesser;
-  if (umfang <= 0.0f) return 0.0f;
-  return (float)stepsPerRevolution / umfang;
+  if (!(walzendurchmesser >= 1.0f)) return 0.0f;
+  return (float)stepsPerRevolution / (PI * walzendurchmesser);
 }
 
 // Startet einen Lauf ueber eine feste Schrittzahl. Liefert false, wenn das Band

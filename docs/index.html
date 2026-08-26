@@ -863,6 +863,15 @@
   <h3>Changelog</h3>
   <div class="changelog">
     <div class="cl-entry">
+      <div class="cl-ver">v1.3.1</div>
+      <ul class="cl-items">
+        <li>Browser-Upload repariert: der Magic-Check durchsuchte nur die ersten 512&nbsp;Byte,
+            der String liegt aber im <code>.rodata</code> am Ende des Images &mdash; damit wurde
+            jede echte Firmware abgewiesen</li>
+        <li><code>steps_per_mm</code> liefert kein <code>inf</code> mehr bei Walzendurchmesser&nbsp;0</li>
+      </ul>
+    </div>
+    <div class="cl-entry">
       <div class="cl-ver">v1.3.0</div>
       <ul class="cl-items">
         <li>JSON-API unter <code>/api/…</code> für Fernsteuerung und Skripte</li>
