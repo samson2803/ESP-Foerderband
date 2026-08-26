@@ -60,24 +60,25 @@ dies und transportiert den Purge-Abfall automatisch in einen Schacht/Mülleimer.
 | Einstellung | Wert |
 |---|---|
 | Board | Generic ESP8266 Module |
-| Flash Size | **1MB (FS:64KB OTA:~470KB)** — siehe Warnung |
+| Flash Size | **4MB (FS:2MB OTA:~1019KB)** — siehe Warnung |
 | Upload Speed | 115200 |
 | Reset Method | dtr (nodemcu) |
 
 > **Flash Size nicht ändern.** Der EEPROM-Sektor liegt beim ESP8266 am Ende des
-> *konfigurierten* Flash-Bereichs. Eine andere Flash-Size verschiebt ihn — die Firmware
-> findet dann weder die WLAN-Zugangsdaten noch die Motoreinstellungen und fällt beim
-> nächsten Start in den AP-Modus („Foerderband-Setup"). Das Gerät ist dabei nicht
-> beschädigt, muss aber über das Portal neu eingerichtet werden.
+> *konfigurierten* Flash-Bereichs. Eine andere Flash Size verschiebt ihn — die Firmware
+> findet dann weder die WLAN-Zugangsdaten noch die Motoreinstellungen und startet als
+> Access Point „Foerderband-Setup". Das Gerät ist dabei nicht beschädigt, muss aber
+> über das Portal (`192.168.4.1`) neu eingerichtet werden.
 >
-> `1M64` ist zugleich der Standard von `arduino-cli` für `esp8266:esp8266:generic`,
-> ein `--fqbn esp8266:esp8266:generic` ohne Zusatz ist also korrekt.
+> **Achtung bei `arduino-cli`:** dessen Voreinstellung für `esp8266:esp8266:generic` ist
+> `1M64`, nicht 4MB. Die Flash Size muss deshalb im FQBN mit angegeben werden —
+> `--fqbn esp8266:esp8266:generic:eesz=4M2M`. Ohne den Zusatz landet das Gerät im AP-Modus.
 
 ### Flashen
 
 ```bash
-arduino-cli compile --fqbn esp8266:esp8266:generic foerderband_web
-arduino-cli upload --fqbn esp8266:esp8266:generic --port COM3 foerderband_web
+arduino-cli compile --fqbn esp8266:esp8266:generic:eesz=4M2M foerderband_web
+arduino-cli upload --fqbn esp8266:esp8266:generic:eesz=4M2M --port COM3 foerderband_web
 ```
 
 ---
@@ -156,7 +157,7 @@ Die App zielt standardmäßig auf `foerderband.local` und merkt sich den zuletzt
 
 ### Per OTA (Arduino IDE / arduino-cli)
 ```bash
-arduino-cli upload --fqbn esp8266:esp8266:generic --port foerderband.local foerderband_web
+arduino-cli upload --fqbn esp8266:esp8266:generic:eesz=4M2M --port foerderband.local foerderband_web
 ```
 
 ---
