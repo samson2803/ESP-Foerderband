@@ -863,6 +863,16 @@
   <h3>Changelog</h3>
   <div class="changelog">
     <div class="cl-entry">
+      <div class="cl-ver">v1.3.0</div>
+      <ul class="cl-items">
+        <li>JSON-API unter <code>/api/…</code> für Fernsteuerung und Skripte</li>
+        <li>Fahren nach Strecke statt nur nach Umdrehungen (<code>/api/run?cm=30</code>)</li>
+        <li>Laufender Auftrag abbrechbar (<code>/api/stop</code>)</li>
+        <li>Fortschritt während der Fahrt abfragbar (<code>/api/status</code>)</li>
+        <li>Desktop-Steuerung für Windows (VB.NET, Ordner <code>desktop/</code>)</li>
+      </ul>
+    </div>
+    <div class="cl-entry">
       <div class="cl-ver">v1.2.0</div>
       <ul class="cl-items">
         <li>Update-Check im Firmware-Tab: prüft per GitHub ob neue Version verfügbar</li>
@@ -928,7 +938,85 @@
 </section>
 
 <section>
-  <h2><span class="num">09</span>3D-Druck</h2>
+  <h2><span class="num">09</span>Fernsteuerung: JSON-API &amp; Desktop-App</h2>
+  <p style="color:var(--muted);margin-bottom:20px;">
+    Ab Firmware&nbsp;v1.3.0 l&auml;sst sich das Band nicht nur per Lichtschranke und Webinterface
+    ausl&ouml;sen, sondern gezielt <strong style="color:var(--text);">nach Strecke</strong> fahren &mdash;
+    per HTTP von jedem Ger&auml;t im Netz. Alle Endpoints antworten mit JSON und vertragen einfache
+    GET-Aufrufe, sind also direkt in der Browser-Adresszeile testbar.
+  </p>
+
+  <div class="card">
+    <table>
+      <thead>
+        <tr>
+          <th>Endpoint</th>
+          <th>Zweck</th>
+          <th>Fehlerfall</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>GET /api/status</code></td>
+          <td>Zustand, Fortschritt und Einstellungen</td>
+          <td>&mdash;</td>
+        </tr>
+        <tr>
+          <td><code>GET /api/run?cm=30</code></td>
+          <td>Strecke fahren &mdash; auch <code>mm=</code>, <code>rev=</code>, <code>steps=</code>;
+              ohne Parameter die gespeicherte Umdrehungszahl</td>
+          <td><code>409</code> wenn das Band bereits l&auml;uft</td>
+        </tr>
+        <tr>
+          <td><code>GET /api/stop</code></td>
+          <td>Laufenden Auftrag sofort abbrechen, Treiber stromlos</td>
+          <td>&mdash;</td>
+        </tr>
+        <tr>
+          <td><code>GET /api/config</code></td>
+          <td>Ohne Parameter lesend, mit Parametern schreibend
+              (<code>delay</code>, <code>umdr</code>, <code>durchm</code>) &mdash; landet im EEPROM</td>
+          <td><code>400</code> bei Wert au&szlig;erhalb der Grenzen</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note tip" style="margin-top:16px;">
+    <strong>Strecke &rarr; Schritte:</strong> Eine Umdrehung der Walze transportiert
+    <code>&pi; &times; Walzendurchmesser</code> Millimeter Band. Bei 33,5&nbsp;mm sind das
+    105,2&nbsp;mm je Umdrehung, also <code>2011 / 105,2 &asymp; 19,11</code> Schritte je Millimeter.
+    30&nbsp;cm entsprechen damit 5.732 Schritten &mdash; bei 800&nbsp;&micro;s rund 9&nbsp;Sekunden Fahrt.
+  </div>
+
+  <div class="card" style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:16px;">
+    <div>
+      <h3 style="margin-top:0;">Verhalten</h3>
+      <ul style="list-style:none;display:flex;flex-direction:column;gap:8px;font-size:14px;padding:0;margin:0;color:var(--muted);">
+        <li><span style="color:var(--green);">&#10003;</span>&nbsp; Jede Aktion antwortet mit dem vollen Status &mdash; kein Nachfragen n&ouml;tig</li>
+        <li><span style="color:var(--green);">&#10003;</span>&nbsp; Ein laufender Auftrag wird nie unterbrochen</li>
+        <li><span style="color:var(--green);">&#10003;</span>&nbsp; Nach <code>/api/stop</code> bleibt <code>steps_remaining</code> stehen &mdash; daran ist der Abbruch erkennbar</li>
+        <li><span style="color:var(--red);">&#10007;</span>&nbsp; Auftr&auml;ge &uuml;ber 2.000.000 Schritte (&asymp;&nbsp;104&nbsp;m) werden abgewiesen</li>
+      </ul>
+    </div>
+    <div>
+      <h3 style="margin-top:0;">Desktop-App (Windows)</h3>
+      <p style="font-size:14px;color:var(--muted);margin-bottom:10px;">
+        Im Ordner <code>desktop/</code> liegt eine VB.NET-WinForms-Steuerung: Strecke in cm oder mm
+        eingeben, Schnellwahl f&uuml;r 10/20/30/50&nbsp;cm, Not-Stop und ein Fortschrittsbalken, der
+        w&auml;hrend der Fahrt alle 300&nbsp;ms nachgef&uuml;hrt wird. Die Motoreinstellungen sind aus
+        der App heraus &auml;nderbar.
+      </p>
+      <div style="background:var(--surface2);border-radius:6px;padding:12px;font-family:'Courier New',monospace;font-size:12px;color:var(--muted);">
+        <div>desktop\FoerderbandControl.sln</div>
+        <div style="border-top:1px solid var(--border);margin-top:6px;padding-top:6px;color:var(--accent);">.NET Framework &middot; Standardziel: foerderband.local</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2><span class="num">10</span>3D-Druck</h2>
   <p style="color:var(--muted);margin-bottom:20px;font-size:14px;">
     Das Förderband-Chassis ist nicht selbst konstruiert — es basiert auf einem ausgezeichneten
     Open-Source-Modell von MakerWorld. Vielen Dank an den ursprünglichen Designer!

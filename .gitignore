@@ -1,0 +1,12 @@
+# Build-Ausgaben der Desktop-App
+[Bb]in/
+[Oo]bj/
+*.user
+*.suo
+.vs/
+
+# Kompilierte Firmware
+*.bin
+*.elf
+*.map
+build/

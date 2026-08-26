@@ -8,6 +8,11 @@
   - Lichtschranke loest per Flankenerkennung konfigurierbare Umdrehungen aus
   - Webinterface: Status, Geschwindigkeit, Umdrehungen, Walzendurchmesser,
     manueller Start, Firmware-Update (OTA per Browser)
+  - JSON-API unter /api/... fuer Desktop-App und Skripte:
+      /api/status  Zustand + Fortschritt
+      /api/run     Strecke fahren (?cm= ?mm= ?rev= ?steps=)
+      /api/stop    laufenden Auftrag abbrechen
+      /api/config  Einstellungen lesen (ohne Parameter) / schreiben (mit)
   - WLAN-Zugangsdaten und Motor-Einstellungen persistent im EEPROM
   - Captive-Portal Access Point ("Foerderband-Setup") bei fehlendem WLAN
   - OTA-Update per Arduino IDE / arduino-cli (foerderband.local) und Browser
@@ -23,7 +28,7 @@
   GitHub: https://github.com/...
 */
 
-#define FIRMWARE_VERSION "1.2.0"
+#define FIRMWARE_VERSION "1.3.0"
 
 #include <ESP8266WiFi.h>
 #include <ESP8266WebServer.h>
@@ -48,7 +53,11 @@ float walzendurchmesser = 33.5;
 // ---- Laufzeit-Status ----
 bool isRunning = false;
 long stepsRemaining = 0;
+long stepsTotal     = 0;   // Gesamtschritte des laufenden Auftrags (fuer Fortschritt)
 int  lastSensorState = LOW;
+
+// Obergrenze je Fahrauftrag - schuetzt vor Tippfehlern wie "3000cm" ueber die API.
+const long MAX_RUN_STEPS = 2000000L;
 
 // ---- WLAN-Konfiguration ----
 #define EEPROM_SIZE        128
@@ -358,14 +367,140 @@ void handleFirmwareUpload() {
   }
 }
 
+// ---------- Motorsteuerung ----------
+
+// Bandweg pro Umdrehung = PI * Walzendurchmesser -> daraus die Schritte je Millimeter.
+float stepsPerMm() {
+  float umfang = PI * walzendurchmesser;
+  if (umfang <= 0.0f) return 0.0f;
+  return (float)stepsPerRevolution / umfang;
+}
+
+// Startet einen Lauf ueber eine feste Schrittzahl. Liefert false, wenn das Band
+// schon laeuft - ein laufender Auftrag wird nie unterbrochen.
+bool startBeltSteps(long steps) {
+  if (isRunning || steps <= 0) return false;
+  stepsTotal     = steps;
+  stepsRemaining = steps;
+  digitalWrite(DIR_PIN, LOW);
+  digitalWrite(ENA_PIN, LOW);
+  isRunning = true;
+  Serial.printf("- Stepper ON (%ld Schritte)\n", steps);
+  return true;
+}
+
+// Lauf ueber die gespeicherte Umdrehungszahl (Lichtschranke, /trigger).
 void startBelt() {
-  if (!isRunning) {
-    stepsRemaining = (long)stepsPerRevolution * umdrehungenSoll;
-    digitalWrite(DIR_PIN, LOW);
-    digitalWrite(ENA_PIN, LOW);
-    isRunning = true;
-    Serial.println("- Stepper ON");
+  startBeltSteps((long)stepsPerRevolution * umdrehungenSoll);
+}
+
+// Bricht einen laufenden Auftrag sofort ab und schaltet den Treiber stromlos.
+// stepsRemaining bleibt absichtlich stehen: daran erkennt die App hinterher,
+// dass abgebrochen wurde und wie weit das Band gekommen ist.
+void stopBelt() {
+  if (!isRunning) return;
+  isRunning = false;
+  digitalWrite(ENA_PIN, HIGH);
+  Serial.printf("- Stepper OFF (Stop bei %ld von %ld Schritten)\n",
+                stepsTotal - stepsRemaining, stepsTotal);
+}
+
+// ---------- JSON-API ----------
+
+void sendJson(int code, const String& json) {
+  server.sendHeader("Access-Control-Allow-Origin", "*");
+  server.send(code, "application/json", json);
+}
+
+void sendApiError(int code, const String& msg) {
+  sendJson(code, "{\"ok\":false,\"error\":\"" + msg + "\"}");
+}
+
+// Vollstaendiger Geraetezustand - Antwort auf /api/status und auf jede Aktion,
+// damit die App nach einem Befehl nicht extra nachfragen muss.
+String statusJson() {
+  float spm  = stepsPerMm();
+  long  done = stepsTotal - stepsRemaining;
+  if (done < 0) done = 0;
+
+  String j = "{\"ok\":true";
+  j += ",\"running\":"         + String(isRunning ? "true" : "false");
+  j += ",\"sensor\":"          + String(digitalRead(sensorPin) == HIGH ? "true" : "false");
+  j += ",\"steps_total\":"     + String(stepsTotal);
+  j += ",\"steps_done\":"      + String(done);
+  j += ",\"steps_remaining\":" + String(stepsRemaining);
+  j += ",\"mm_total\":"        + String(spm > 0.0f ? stepsTotal / spm : 0.0f, 1);
+  j += ",\"mm_done\":"         + String(spm > 0.0f ? done / spm : 0.0f, 1);
+  j += ",\"steps_per_mm\":"    + String(spm, 3);
+  j += ",\"steps_per_rev\":"   + String(stepsPerRevolution);
+  j += ",\"delay_us\":"        + String((int)stepDelayUs);
+  j += ",\"umdrehungen\":"     + String(umdrehungenSoll);
+  j += ",\"walze_mm\":"        + String(walzendurchmesser, 1);
+  j += ",\"version\":\"" FIRMWARE_VERSION "\"";
+  j += ",\"ip\":\""            + WiFi.localIP().toString() + "\"";
+  j += ",\"rssi\":"            + String(WiFi.RSSI());
+  j += "}";
+  return j;
+}
+
+void handleApiStatus() {
+  sendJson(200, statusJson());
+}
+
+// /api/run?cm=30 | ?mm=300 | ?rev=2 | ?steps=5732
+// Ohne Parameter faehrt die gespeicherte Umdrehungszahl (wie die Lichtschranke).
+void handleApiRun() {
+  if (isRunning) { sendApiError(409, "Band laeuft bereits"); return; }
+
+  long steps;
+  if (server.hasArg("steps")) {
+    steps = server.arg("steps").toInt();
+  } else if (server.hasArg("mm") || server.hasArg("cm")) {
+    float mm = server.hasArg("mm") ? server.arg("mm").toFloat()
+                                   : server.arg("cm").toFloat() * 10.0f;
+    float spm = stepsPerMm();
+    if (spm <= 0.0f) { sendApiError(500, "Walzendurchmesser ungueltig"); return; }
+    steps = lround(mm * spm);
+  } else if (server.hasArg("rev")) {
+    steps = lround(server.arg("rev").toFloat() * stepsPerRevolution);
+  } else {
+    steps = (long)stepsPerRevolution * umdrehungenSoll;
   }
+
+  if (steps <= 0)            { sendApiError(400, "Strecke muss groesser als 0 sein"); return; }
+  if (steps > MAX_RUN_STEPS) { sendApiError(400, "Strecke zu gross"); return; }
+
+  startBeltSteps(steps);
+  sendJson(200, statusJson());
+}
+
+void handleApiStop() {
+  stopBelt();
+  sendJson(200, statusJson());
+}
+
+// Ohne Parameter lesend, mit Parametern schreibend (dann auch im EEPROM gesichert).
+void handleApiConfig() {
+  bool changed = false;
+
+  if (server.hasArg("delay")) {
+    float v = server.arg("delay").toFloat();
+    if (v < 100.0f || v > 5000.0f) { sendApiError(400, "delay muss zwischen 100 und 5000 liegen"); return; }
+    stepDelayUs = v; changed = true;
+  }
+  if (server.hasArg("umdr")) {
+    int v = server.arg("umdr").toInt();
+    if (v < 1 || v > 100) { sendApiError(400, "umdr muss zwischen 1 und 100 liegen"); return; }
+    umdrehungenSoll = v; changed = true;
+  }
+  if (server.hasArg("durchm")) {
+    float v = server.arg("durchm").toFloat();
+    if (v < 1.0f || v > 200.0f) { sendApiError(400, "durchm muss zwischen 1 und 200 liegen"); return; }
+    walzendurchmesser = v; changed = true;
+  }
+
+  if (changed) saveMotorSettings();
+  sendJson(200, statusJson());
 }
 
 // ---------- WLAN-Einrichtungsseite (AP-Modus) ----------
@@ -470,6 +605,12 @@ void setup() {
     server.on("/trigger", handleTrigger);
     server.on("/wifi/reset", handleWifiReset);
     server.on("/update", HTTP_POST, handleFirmwareUpdate, handleFirmwareUpload);
+
+    // JSON-API fuer Desktop-App und Skripte (GET wie POST, damit im Browser testbar)
+    server.on("/api/status", handleApiStatus);
+    server.on("/api/run",    handleApiRun);
+    server.on("/api/stop",   handleApiStop);
+    server.on("/api/config", handleApiConfig);
 
     ArduinoOTA.setHostname("foerderband");
     ArduinoOTA.onStart([]() { Serial.println("ArduinoOTA startet..."); });

@@ -14,6 +14,8 @@ dies und transportiert den Purge-Abfall automatisch in einen Schacht/Mülleimer.
 
 - **Automatische Auslösung** per Lichtschranke (Flankenerkennung, kein Dauerbetrieb)
 - **Webinterface** zur Konfiguration von Geschwindigkeit, Umdrehungen und Walzendurchmesser
+- **JSON-API** zum Fahren nach Strecke, Abbrechen und Statusabfrage
+- **Desktop-Steuerung** für Windows (VB.NET) — „fahre jetzt 30 cm" per Knopfdruck
 - **Wegberechnung** im Browser (Weg/Umdrehung und Gesamtweg live berechnet)
 - **Firmware-Update per Browser** (kein PC-Tool nötig, Fortschrittsanzeige)
 - **OTA-Update** per Arduino IDE / arduino-cli (`foerderband.local`)
@@ -91,6 +93,48 @@ stepsPerRevolution = (gemessener Bandweg in mm / Anzahl Soll-Umdrehungen) / (π 
 
 Einfacher: Im Webinterface Walzendurchmesser eintragen und den angezeigten Gesamtweg mit dem
 tatsächlichen Bandweg vergleichen. `stepsPerRevolution` entsprechend anpassen.
+
+---
+
+## Fernsteuerung
+
+### JSON-API (ab Firmware v1.3.0)
+
+Alle Endpoints vertragen einfache GET-Aufrufe und antworten mit dem vollständigen Gerätestatus —
+nach einem Befehl muss also nicht extra nachgefragt werden.
+
+| Endpoint | Zweck |
+|---|---|
+| `GET /api/status` | Zustand, Fortschritt und Einstellungen |
+| `GET /api/run?cm=30` | Strecke fahren — auch `mm=`, `rev=`, `steps=`; ohne Parameter die gespeicherte Umdrehungszahl |
+| `GET /api/stop` | Laufenden Auftrag abbrechen, Treiber stromlos |
+| `GET /api/config` | Ohne Parameter lesend, mit Parametern schreibend (`delay`, `umdr`, `durchm`) |
+
+```bash
+curl "http://foerderband.local/api/run?cm=30"
+```
+
+Ein laufender Auftrag wird nie unterbrochen — ein zweites `/api/run` liefert `409`. Nach einem
+`/api/stop` bleibt `steps_remaining` stehen; daran ist erkennbar, dass abgebrochen wurde und wie
+weit das Band gekommen ist.
+
+**Strecke → Schritte:** Eine Umdrehung transportiert `π × Walzendurchmesser` mm Band. Bei 33,5 mm
+sind das 105,2 mm je Umdrehung, also `2011 / 105,2 ≈ 19,11` Schritte je Millimeter — 30 cm
+entsprechen 5.732 Schritten.
+
+### Desktop-App (Windows)
+
+Im Ordner [`desktop/`](desktop/) liegt eine VB.NET-WinForms-Steuerung: Strecke in cm oder mm
+eingeben, Schnellwahl für 10/20/30/50 cm, Not-Stop und ein Fortschrittsbalken, der während der
+Fahrt alle 300 ms nachgeführt wird. Die Motoreinstellungen sind aus der App heraus änderbar.
+
+Öffnen mit `desktop\FoerderbandControl.sln` (Visual Studio) oder bauen per MSBuild:
+
+```bash
+msbuild desktop\FoerderbandControl.sln -p:Configuration=Release
+```
+
+Die App zielt standardmäßig auf `foerderband.local` und merkt sich den zuletzt benutzten Host.
 
 ---
 
