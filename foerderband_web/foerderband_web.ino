@@ -28,7 +28,7 @@
   GitHub: https://github.com/...
 */
 
-#define FIRMWARE_VERSION "1.3.1"
+#define FIRMWARE_VERSION "1.3.2"
 
 #include <ESP8266WiFi.h>
 #include <ESP8266WebServer.h>
@@ -365,7 +365,7 @@ void handleFirmwareUpdate() {
   if (!uploadMagicOk) {
     server.send(400, "text/plain", "Falsche Firmware: Magic nicht gefunden. Nur Foerderband-Firmware kann per Browser hochgeladen werden.");
   } else if (Update.hasError()) {
-    server.send(500, "text/plain", "Update fehlgeschlagen");
+    server.send(500, "text/plain", "Update fehlgeschlagen: " + Update.getErrorString());
   } else {
     server.send(200, "text/plain", "OK");
     delay(500);
@@ -380,7 +380,16 @@ void handleFirmwareUpload() {
     Serial.printf("HTTP OTA: %s\n", upload.filename.c_str());
     uploadMagicOk = false;
     magicTailLen  = 0;
-    Update.begin((size_t)0xFFFFFFFF);
+
+    // Platz zwischen dem Ende des laufenden Sketches und dem Dateisystem.
+    // Vorher stand hier 0xFFFFFFFF: beim Aufrunden auf Sektorgroesse lief das
+    // in 32 Bit auf 0 ueber, wodurch das Update am Anfang des Dateisystem-
+    // bereichs landete statt direkt hinter dem Sketch.
+    uint32_t freeSpace = (ESP.getFreeSketchSpace() - 0x1000) & 0xFFFFF000;
+    if (!Update.begin(freeSpace)) {
+      Serial.printf("HTTP OTA: Start fehlgeschlagen (%u Bytes frei) - %s\n",
+                    freeSpace, Update.getErrorString().c_str());
+    }
 
   } else if (upload.status == UPLOAD_FILE_WRITE) {
     magicScan(upload.buf, upload.currentSize);
